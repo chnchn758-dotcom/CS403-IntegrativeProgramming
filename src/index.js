@@ -2,10 +2,14 @@ require('dotenv').config();
 
 const pool = require('./config/database');
 const express = require('express');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 
 const PORT = 3000;
+
+// Needed so req.body is populated for /auth/register, /auth/login, etc.
+app.use(express.json());
 
 // Test database connection
 pool.query('SELECT NOW()')
@@ -20,6 +24,10 @@ pool.query('SELECT NOW()')
 app.get('/', (req, res) => {
   res.send('Hello, World! Express is working.');
 });
+
+// Auth + protected routes: /auth/register, /auth/login, /auth/refresh,
+// /auth/logout, /profile, /admin/users
+app.use(authRoutes);
 
 // Start the server
 app.listen(PORT, () => {
