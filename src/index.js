@@ -8,10 +8,9 @@ const app = express();
 
 const PORT = 3000;
 
-// Needed so req.body is populated for /auth/register, /auth/login, etc.
 app.use(express.json());
 
-// Test database connection
+
 pool.query('SELECT NOW()')
   .then(() => {
     console.log('Database connected successfully!');
