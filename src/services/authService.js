@@ -11,7 +11,6 @@ const SALT_ROUNDS = 10;
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days, matches jwt.js default
 
 async function register({ name, email, password }) {
-  console.log('2. Hashing password...');
   const existing = await userModel.findByEmail(email);
   if (existing) {
     const error = new Error('An account with this email already exists.');
@@ -20,7 +19,6 @@ async function register({ name, email, password }) {
   }
 
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-  console.log('3. Password hashed to:', passwordHash);
   const user = await userModel.createUser({ name, email, passwordHash });
   return user; // never includes password_hash
 }
@@ -43,8 +41,6 @@ async function login({ email, password }) {
   const safeUser = { id: user.id, name: user.name, email: user.email, role: user.role };
   const accessToken = signAccessToken(safeUser);
   const refreshToken = signRefreshToken(safeUser);
-  console.log('4. Access token created:', accessToken);
-  console.log('5. Refresh token created:', refreshToken);
 
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
   await refreshTokenModel.store(user.id, refreshToken, expiresAt);

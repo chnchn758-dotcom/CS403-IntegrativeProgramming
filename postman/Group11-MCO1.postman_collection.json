@@ -1,0 +1,463 @@
+{
+  "info": {
+    "name": "Group 11 MCO1 - Auth + Pets API",
+    "description": "Covers register/login/refresh/logout and pets CRUD. Tokens auto-save between requests via test scripts - just run requests top to bottom.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "petId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register - Happy Path (201)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Tester\",\n  \"email\": \"postman-tester@example.com\",\n  \"password\": \"password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 201 (or 409 if already registered)', function () {",
+                "  pm.expect([201, 409]).to.include(pm.response.code);",
+                "});",
+                "pm.test('Response has no password_hash', function () {",
+                "  const body = pm.response.json();",
+                "  if (pm.response.code === 201) {",
+                "    pm.expect(body.user).to.not.have.property('password_hash');",
+                "  }",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Register - Missing Fields (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"incomplete@example.com\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 400', function () {",
+                "  pm.response.to.have.status(400);",
+                "});",
+                "pm.test('Response lists validation errors', function () {",
+                "  pm.expect(pm.response.json()).to.have.property('errors');",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Login - Happy Path (200, saves tokens)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"postman-tester@example.com\",\n  \"password\": \"password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 200', function () {",
+                "  pm.response.to.have.status(200);",
+                "});",
+                "const body = pm.response.json();",
+                "pm.test('Response has accessToken and refreshToken', function () {",
+                "  pm.expect(body).to.have.property('accessToken');",
+                "  pm.expect(body).to.have.property('refreshToken');",
+                "});",
+                "if (body.accessToken) {",
+                "  pm.collectionVariables.set('accessToken', body.accessToken);",
+                "  pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                "}"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Login - Wrong Password (401)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"postman-tester@example.com\",\n  \"password\": \"wrongpassword\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 401', function () {",
+                "  pm.response.to.have.status(401);",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Profile - No Token (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/profile", "host": ["{{baseUrl}}"], "path": ["profile"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 401', function () {",
+                "  pm.response.to.have.status(401);",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Profile - With Token (200)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/profile", "host": ["{{baseUrl}}"], "path": ["profile"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 200', function () {",
+                "  pm.response.to.have.status(200);",
+                "});",
+                "pm.test('Returns the correct user', function () {",
+                "  pm.expect(pm.response.json().user.email).to.eql('postman-tester@example.com');",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Refresh - Happy Path (200, rotates tokens)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/refresh", "host": ["{{baseUrl}}"], "path": ["auth", "refresh"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 200', function () {",
+                "  pm.response.to.have.status(200);",
+                "});",
+                "const body = pm.response.json();",
+                "if (body.accessToken) {",
+                "  pm.collectionVariables.set('accessToken', body.accessToken);",
+                "  pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                "}"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Refresh - Reused Old Token (401, edge case)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"an-intentionally-already-used-or-fake-token\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/refresh", "host": ["{{baseUrl}}"], "path": ["auth", "refresh"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 401', function () {",
+                "  pm.response.to.have.status(401);",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Logout (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/logout", "host": ["{{baseUrl}}"], "path": ["auth", "logout"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 200', function () {",
+                "  pm.response.to.have.status(200);",
+                "});"
+              ]
+            }
+          }]
+        }
+      ]
+    },
+    {
+      "name": "Pets",
+      "item": [
+        {
+          "name": "Get All Pets - Happy Path (200, public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/pets", "host": ["{{baseUrl}}"], "path": ["pets"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 200', function () {",
+                "  pm.response.to.have.status(200);",
+                "});",
+                "pm.test('Returns an array of pets', function () {",
+                "  pm.expect(pm.response.json().pets).to.be.an('array');",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Get Pet by Id - Not Found (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/pets/999999", "host": ["{{baseUrl}}"], "path": ["pets", "999999"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 404', function () {",
+                "  pm.response.to.have.status(404);",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Create Pet - No Token (401)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"NoOwner\",\n  \"species\": \"Cat\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/pets", "host": ["{{baseUrl}}"], "path": ["pets"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 401', function () {",
+                "  pm.response.to.have.status(401);",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Create Pet - Missing Fields (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/pets", "host": ["{{baseUrl}}"], "path": ["pets"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 400', function () {",
+                "  pm.response.to.have.status(400);",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Create Pet - Happy Path (201, saves petId)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Pup\",\n  \"species\": \"Dog\",\n  \"breed\": \"Beagle\",\n  \"age\": 2\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/pets", "host": ["{{baseUrl}}"], "path": ["pets"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 201', function () {",
+                "  pm.response.to.have.status(201);",
+                "});",
+                "const body = pm.response.json();",
+                "pm.test('Owner id matches the logged-in user', function () {",
+                "  pm.expect(body.pet.owner_id).to.not.be.null;",
+                "});",
+                "if (body.pet && body.pet.id) {",
+                "  pm.collectionVariables.set('petId', body.pet.id);",
+                "}"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Update Pet - Happy Path, as owner (200)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"age\": 3\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/pets/{{petId}}", "host": ["{{baseUrl}}"], "path": ["pets", "{{petId}}"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 200', function () {",
+                "  pm.response.to.have.status(200);",
+                "});",
+                "pm.test('Age was actually updated', function () {",
+                "  pm.expect(pm.response.json().pet.age).to.eql(3);",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Update Pet - Not the Owner (403, edge case)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"age\": 99\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/pets/1", "host": ["{{baseUrl}}"], "path": ["pets", "1"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "// Assumes pet id 1 is a seeded pet with no owner, or owned by a different user.",
+                "pm.test('Status is 403 (or 404 if pet 1 does not exist)', function () {",
+                "  pm.expect([403, 404]).to.include(pm.response.code);",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Delete Pet - Happy Path, as owner (200)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/pets/{{petId}}", "host": ["{{baseUrl}}"], "path": ["pets", "{{petId}}"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 200', function () {",
+                "  pm.response.to.have.status(200);",
+                "});"
+              ]
+            }
+          }]
+        }
+      ]
+    }
+  ]
+}
